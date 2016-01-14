@@ -3,14 +3,9 @@ import Geo from '../geo';
 import {MethodNotImplemented} from '../utils/errors';
 import Utils from '../utils/utils';
 
-
 export default class DataSource {
 
     constructor (source) {
-		console.log('this source at top of constructor',source)
-		//if (source.db==true){console.log('does it think this is true instead???',this.db);this.db = true;}
-		//if (this.db){console.log('this',this)}
-		this.type = source.type; //added by Dan for if, below
         this.id = source.id;
         this.name = source.name;
         this.url = source.url;
@@ -42,7 +37,6 @@ export default class DataSource {
 
         // overzoom will apply for zooms higher than this
         this.max_zoom = source.max_zoom || Geo.default_max_zoom;
-		
     }
 
     // Create a tile source by type, factory-style
@@ -88,14 +82,12 @@ export default class DataSource {
             }
         }
     }
-	static loadDBData (feature){
-		console.log(feature)
-	}
-    load(dest) {   
+
+    load(dest) {
         dest.source_data = {};
         dest.source_data.layers = {};
         dest.pad_scale = this.pad_scale;
-		dest.type = this.type;
+
         return this._load(dest).then((dest) => {
             // Post-processing
             for (let layer in dest.source_data.layers) {
@@ -153,43 +145,39 @@ export class NetworkSource extends DataSource {
 
     _load (dest) {
         // super.load(dest);
-		console.log('dest in network, before Utils.io',dest)
-		//Utils.db('test')
+
         let url = this.formatUrl(dest);
 
-        //let source_data = dest.source_data;  //Dan moved
+        let source_data = dest.source_data;
         source_data.url = url;
         dest.debug = dest.debug || {};
         dest.debug.network = +new Date();
-		
-		if (dest.type == 'DBGeoJSON'){ //Dan's if statement
-			//I believe that source_data can be correctly formatted to return
-			return 
-		}else{ //end of Dan's condition
-        	return new Promise((resolve, reject) => {
-        	    source_data.error = null;
-        	    // For testing network errors
-        	    // var promise = Utils.io(url, 60 * 100, this.response_type);
-        	    // if (Math.random() < .7) {
-        	    //     promise = Promise.reject(Error('fake data source error'));
-        	    // }
-        	    // promise.then((body) => {
-        	    let promise = Utils.io(url, 60 * 1000, this.response_type);
-        	    source_data.request = promise.request;
-        	
-        	    promise.then((body) => {
-        	        dest.debug.response_size = body.length || body.byteLength;
-        	        dest.debug.network = +new Date() - dest.debug.network;
-        	        dest.debug.parsing = +new Date();
-        	        this.parseSourceData(dest, source_data, body);
-        	        dest.debug.parsing = +new Date() - dest.debug.parsing;
-        	        resolve(dest);
-        	    }).catch((error) => {
-        	        source_data.error = error.toString();
-        	        resolve(dest); // resolve request but pass along error
-        	    });
-        	});
-		}; //end of Dan's if
+        if (dest.source != 'osm'){
+        console.log('dest inside _load NetworkSource',dest)}
+
+        return new Promise((resolve, reject) => {
+            source_data.error = null;
+            // For testing network errors
+            // var promise = Utils.io(url, 60 * 100, this.response_type);
+            // if (Math.random() < .7) {
+            //     promise = Promise.reject(Error('fake data source error'));
+            // }
+            // promise.then((body) => {
+            let promise = Utils.io(url, 60 * 1000, this.response_type);
+            source_data.request = promise.request;
+
+            promise.then((body) => {
+                dest.debug.response_size = body.length || body.byteLength;
+                dest.debug.network = +new Date() - dest.debug.network;
+                dest.debug.parsing = +new Date();
+                this.parseSourceData(dest, source_data, body);
+                dest.debug.parsing = +new Date() - dest.debug.parsing;
+                resolve(dest);
+            }).catch((error) => {
+                source_data.error = error.toString();
+                resolve(dest); // resolve request but pass along error
+            });
+        });
     }
 
     // Sub-classes must implement:

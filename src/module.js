@@ -15,6 +15,7 @@ import log from 'loglevel';
 import Geo from './geo';
 import DataSource from './sources/data_source';
 import './sources/geojson';
+import './sources/dbgeojson';  //Dan's addition
 import './sources/topojson';
 import './sources/mvt';
 import TileManager from './tile_manager';

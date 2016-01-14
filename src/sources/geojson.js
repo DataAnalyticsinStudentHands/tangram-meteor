@@ -13,7 +13,6 @@ import geojsonvt from 'geojson-vt';
 export class GeoJSONSource extends NetworkSource {
 
     constructor(source) {
-		console.log('geojsonsource in constructor',source)
         super(source);
         this.tiled = true;
         this.load_data = null;

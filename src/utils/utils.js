@@ -99,7 +99,6 @@ Utils.db = function (tst){
 }
 
 Utils.io = function (url, timeout = 60000, responseType = 'text', method = 'GET', headers = {}) {
-	console.log('url in Utils.io',url)
 	
     var request = new XMLHttpRequest();
     var promise = new Promise((resolve, reject) => {

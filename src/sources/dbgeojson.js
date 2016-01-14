@@ -15,7 +15,7 @@ import geojsonvt from 'geojson-vt';
 export class DBGeoJSONSource extends NetworkSource {
 
     constructor(source) {
-		console.log('geojsonsource in constructor',source)
+		console.log('dbgeojsonsource in constructor',source)
         super(source);
         this.tiled = true;
         this.load_data = null;
@@ -28,9 +28,12 @@ export class DBGeoJSONSource extends NetworkSource {
 	//could gather and send it in as a stream, I guess - but I think there are other questions about which pieces to make reactive that we have to get to first...
 	//can we track everyone by its production in the "new from the ng side??"
     _load(dest) {
+        console.log('testing for load data',this,this.load_data)
         if (!this.load_data) {
+            console.log('this in _load dbg',this)
             this.load_data = super._load({ source_data: { layers: {} } }).then(data => {
                 let layers = data.source_data.layers;
+                console.log('dbgeojson in _load')
                 for (let layer_name in layers) {
                     this.tile_indexes[layer_name] = geojsonvt(layers[layer_name], {
                         maxZoom: this.max_zoom,  // max zoom to preserve detail on
@@ -55,6 +58,7 @@ export class DBGeoJSONSource extends NetworkSource {
     }
 
     getTileFeatures(tile, layer_name) {
+        console.log('inside getTileFeatures dbg',tile)
         let coords = Geo.wrapTile(tile.coords, { x: true });
 
         // request a particular tile
@@ -172,5 +176,5 @@ export class DBGeoJSONTileSource extends NetworkTileSource {
 
 }
 
-DataSource.register(GeoJSONTileSource, 'GeoJSON');      // prefered shorter name
-DataSource.register(GeoJSONTileSource, 'GeoJSONTiles'); // for backwards-compatibility
+DataSource.register(DBGeoJSONTileSource, 'DBGeoJSON');      // prefered shorter name
+DataSource.register(DBGeoJSONTileSource, 'DBGeoJSONTiles'); // for backwards-compatibility
