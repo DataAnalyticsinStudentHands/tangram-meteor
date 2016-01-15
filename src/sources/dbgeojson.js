@@ -50,6 +50,7 @@ export class DBGeoJSONSource extends NetworkSource {
         }
 
         return this.load_data.then(() => {
+            console.log('inside this load data then in dbgeo')
             for (let layer_name in this.tile_indexes) {
                 dest.source_data.layers[layer_name] = this.getTileFeatures(dest, layer_name);
             }

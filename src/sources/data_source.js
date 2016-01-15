@@ -140,6 +140,7 @@ export class NetworkSource extends DataSource {
 
     constructor (source) {
         super(source);
+        console.log('Neworksource',source)
         this.response_type = ""; // use to set explicit XHR type
     }
 
@@ -198,7 +199,7 @@ export class NetworkTileSource extends NetworkSource {
 
     constructor (source) {
         super(source);
-
+console.log('NetworkTileSource',source)
         this.tiled = true;
         this.url_hosts = null;
         var host_match = this.url.match(/{s:\[([^}+]+)\]}/);
