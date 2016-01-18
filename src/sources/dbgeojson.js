@@ -1,4 +1,6 @@
 import DataSource, {NetworkSource, NetworkTileSource} from './data_source';
+//import DataSource from './data_source';
+//import {GeoJSONSource, GeoJSONTileSource} from './geojson';
 import {MVTSource} from './mvt';
 import Geo from '../geo';
 
@@ -13,12 +15,16 @@ import geojsonvt from 'geojson-vt';
 //Could probably do as extends on GeoJSONSource simply
 
 export class DBGeoJSONSource extends NetworkSource {
+//export class DBGeoJSONSource extends DataSource {
 
     constructor(source) {
 		console.log('dbgeojsonsource in constructor',source)
         super(source);
-        this.tiled = true;
+		this.load(source); //see if that lets you do whole replace???
+        this.tiled = true;  //want to figure out how to use tiling to help with visibility
         this.load_data = null;
+        this.sfdata = source.sfdata;
+		this.collect_name = source.collect_name;
         this.tile_indexes = {}; // geojson-vt tile indices, by layer name
         this.max_zoom = Math.max(this.max_zoom || 0, 15); // TODO: max zoom < 15 causes artifacts/no-draw at 20, investigate
         this.pad_scale = 0; // we don't want padding on auto-tiled sources
@@ -27,13 +33,13 @@ export class DBGeoJSONSource extends NetworkSource {
 //figure out how data comes in - if I can put it in the call, then have it work through here as layers...
 	//could gather and send it in as a stream, I guess - but I think there are other questions about which pieces to make reactive that we have to get to first...
 	//can we track everyone by its production in the "new from the ng side??"
+	
     _load(dest) {
-        console.log('testing for load data',this,this.load_data)
+		console.log('inside _load',this)
+		this.parseSourceData(dest,source_data)
         if (!this.load_data) {
-            console.log('this in _load dbg',this)
             this.load_data = super._load({ source_data: { layers: {} } }).then(data => {
                 let layers = data.source_data.layers;
-                console.log('dbgeojson in _load')
                 for (let layer_name in layers) {
                     this.tile_indexes[layer_name] = geojsonvt(layers[layer_name], {
                         maxZoom: this.max_zoom,  // max zoom to preserve detail on
@@ -44,22 +50,20 @@ export class DBGeoJSONSource extends NetworkSource {
                 }
 
                 this.loaded = true;
-				//console.log(data.split('Feature')[0])
                 return data;
             });
         }
 
         return this.load_data.then(() => {
-            console.log('inside this load data then in dbgeo')
+			console.log('this in end of load',this)
             for (let layer_name in this.tile_indexes) {
-                dest.source_data.layers[layer_name] = this.getTileFeatures(dest, layer_name);
+                dest.source_data.layers[layer_name] = this.getDBFeatures(dest, layer_name);
             }
             return dest;
         });
     }
-
-    getTileFeatures(tile, layer_name) {
-        console.log('inside getTileFeatures dbg',tile)
+    getDBFeatures(tile, layer_name) {
+        console.log('inside getTileFeatures dbg',tile,layer_name)
         let coords = Geo.wrapTile(tile.coords, { x: true });
 
         // request a particular tile
@@ -109,15 +113,19 @@ export class DBGeoJSONSource extends NetworkSource {
     }
 
     formatUrl (dest) {
+		console.log('in formatURL')
         return this.url;
     }
 
-    parseSourceData (tile, source, response) {
-        source.layers = this.getLayers(JSON.parse(response));
+    parseSourceData (dest, data) {
+		source.layers = {} 
+		source.layers = this.getLayers(dest.source_data.layers);
+		console.log('in parse',dest,this,source)
     }
 
     // Detect single or multiple layers in returned data
     getLayers (data) {
+		console.log('in getLayers')
         if (data.type === 'Feature' || data.type === 'FeatureCollection') {
             return { _default: data };
         }
@@ -128,54 +136,4 @@ export class DBGeoJSONSource extends NetworkSource {
 
 }
 
-/**
- Mapzen/OSM.US-style GeoJSON vector tiles
- @class GeoJSONTileSource
-*/
-export class DBGeoJSONTileSource extends NetworkTileSource {
-
-    constructor(source) {
-        super(source);
-
-        // Check for URL tile pattern, if not found, treat as standalone GeoJSON/TopoJSON object
-        if (!this.urlHasTilePattern(this.url)) {
-            // Check instance type from parent class
-            if (this instanceof DBGeoJSONTileSource) {
-                // Replace instance type
-                return new DBGeoJSONSource(source);
-            }
-            else {
-                // Pass back to parent class to instantiate
-                return null;
-            }
-        }
-        return this;
-    }
-
-    parseSourceData (tile, source, response) {
-        let data = JSON.parse(response);
-        this.prepareGeoJSON(data, tile, source);
-    }
-
-    prepareGeoJSON (data, tile, source) {
-        // Apply optional data transform
-        if (typeof this.transform === 'function') {
-            data = this.transform(data, this.extra_data);
-        }
-
-        source.layers = DBGeoJSONSource.prototype.getLayers(data);
-
-        // A "synthetic" tile that adjusts the tile min anchor to account for tile longitude wrapping
-        let anchor = {
-            coords: tile.coords,
-            min: Geo.metersForTile(Geo.wrapTile(tile.coords, { x: true }))
-        };
-
-        DataSource.projectData(source); // mercator projection
-        DataSource.scaleData(source, anchor); // re-scale from meters to local tile coords
-    }
-
-}
-
-DataSource.register(DBGeoJSONTileSource, 'DBGeoJSON');      // prefered shorter name
-DataSource.register(DBGeoJSONTileSource, 'DBGeoJSONTiles'); // for backwards-compatibility
+DataSource.register(DBGeoJSONSource, 'DBGeoJSON');
