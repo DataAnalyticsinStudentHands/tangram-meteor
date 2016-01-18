@@ -5,6 +5,7 @@ import Utils from '../utils/utils';
 
 export default class DataSource {
 
+    //called internally from scene.js 965
     constructor (source) {
         this.id = source.id;
         this.name = source.name;
@@ -37,6 +38,7 @@ export default class DataSource {
 
         // overzoom will apply for zooms higher than this
         this.max_zoom = source.max_zoom || Geo.default_max_zoom;
+        //not same as Leaflet - this is just top of where it asks for new tiles - gt is key here
     }
 
     // Create a tile source by type, factory-style
@@ -49,7 +51,6 @@ export default class DataSource {
 
     // Mercator projection
     static projectData (source) {
-		if (source.type=="SingleFeatureGeoJSON"){console.log('proj',source)}
         var timer = +new Date();
         for (var t in source.layers) {
             var num_features = source.layers[t].features.length;
@@ -72,7 +73,6 @@ export default class DataSource {
      Re-scale geometries within each source to internal tile units
     */
     static scaleData (source, {coords: {z}, min, max}) {
-		if (source.type=="SingleFeatureGeoJSON"){console.log('scale',source)}
         let units_per_meter = Geo.unitsPerMeter(z);
         for (var t in source.layers) {
             var num_features = source.layers[t].features.length;
@@ -90,8 +90,8 @@ export default class DataSource {
         dest.source_data = {};
         dest.source_data.layers = {};
         dest.pad_scale = this.pad_scale;
-		dest.name = this.name;  //Dan's for testing
-//console.log('this before return in datasource',this, dest) //happens first
+//		dest.name = this.name;  //Dan's for testing
+console.log('this before return in datasource',this, dest) //happens first
         return this._load(dest).then((dest) => {
 			console.log('dest in load of DataSource',dest)
             // Post-processing
@@ -145,12 +145,12 @@ export class NetworkSource extends DataSource {
 
     constructor (source) {
         super(source);
-		console.log('this in datasource',this)
         this.response_type = ""; // use to set explicit XHR type
     }
 
     _load (dest) {
         // super.load(dest);
+        console.log('is this first? - _load in Network')
         let url = this.formatUrl(dest);
 		
         let source_data = dest.source_data;
@@ -165,33 +165,22 @@ export class NetworkSource extends DataSource {
             // if (Math.random() < .7) {
             //     promise = Promise.reject(Error('fake data source error'));
             // }
-            // promise.then((body) => {
-//			console.log('source_data in DataSource before Utils.io',this,dest,source_data) //Dan's if, below:
-			// if (url=='SingleFeature'){
-			// 	let promise = dest.source_data;
 
             let promise = Utils.io(url, 60 * 1000, this.response_type);
             source_data.request = promise.request;
 			
-			//let promise2 = dest.source_data; //Dan's - has to be outside the if statement
-			if (url=='SingleFeatureData'){ //Dan's - promise2
-				//what to do with promise2 if it's not a function??
-				this.parseSourceData(dest,source_data)
-				resolve(dest);
-			}else{ //Dan's added through here
-            	promise.then((body) => {
-            	    dest.debug.response_size = body.length || body.byteLength;
-            	    dest.debug.network = +new Date() - dest.debug.network;
-            	    dest.debug.parsing = +new Date();
-            	    this.parseSourceData(dest, source_data, body);
-            	    dest.debug.parsing = +new Date() - dest.debug.parsing;
-            	    resolve(dest);
-            	}).catch((error) => {
-					console.log('error from promise',error)
-            	    source_data.error = error.toString();
-            	    resolve(dest); // resolve request but pass along error
-            	});
-			};// Dan's ending the if, but only first part was added
+            promise.then((body) => {
+                dest.debug.response_size = body.length || body.byteLength;
+                dest.debug.network = +new Date() - dest.debug.network;
+                dest.debug.parsing = +new Date();
+                this.parseSourceData(dest, source_data, body);
+                dest.debug.parsing = +new Date() - dest.debug.parsing;
+                resolve(dest);
+            }).catch((error) => {
+				console.log('error from promise',error)
+                source_data.error = error.toString();
+                resolve(dest); // resolve request but pass along error
+            });
         });
     }
 
