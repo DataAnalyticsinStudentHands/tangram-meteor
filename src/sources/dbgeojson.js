@@ -37,9 +37,19 @@ export class DBGeoJSONSource extends DataSource {
         dest.debug.network = +new Date();
         
         console.log('dest.sfdata',dest.sfdata)
+		// dest.sfdata.forEach(function(p){
+// 			console.log('in for Each',p,dest.sfdata[p])
+// 		})
         //wrap this all in the return promise??
         return new Promise((resolve, reject) => {
             let promise = dest.sfdata;
+			console.log('dest before rsolve',dest)
+			resolve(dest.sfdata)
+			console.log('dest after rsolve',dest)
+			// promise.forEach(function(obj){
+			// 	console.log('in return of promise',obj,promise[obj])
+			// })
+		});
        
          /*   
         if (!this.load_data) {
@@ -68,7 +78,7 @@ export class DBGeoJSONSource extends DataSource {
         });
             */
             
-        promise.then((body) => {
+/*        promise((body) => {
             console.log('promise.then',body)
 //            console.log('promiseready?',body.ready())
 //            console.log('promiseas meteor?',body.findOne())
@@ -83,8 +93,9 @@ export class DBGeoJSONSource extends DataSource {
                 source_data.error = error.toString();
                 resolve(dest); // resolve request but pass along error
             });
+			*/
             
-        });
+        
     }
 
     formatUrl (dest) { //still need to replace other??
