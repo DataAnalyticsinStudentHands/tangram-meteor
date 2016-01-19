@@ -48,7 +48,7 @@ export class GeoJSONSource extends NetworkSource {
         });
     }
 
-    getTileFeatures(tile, layer_name) {
+    getTileFeatures(tile, layer_name) {   
         let coords = Geo.wrapTile(tile.coords, { x: true });
 
         // request a particular tile

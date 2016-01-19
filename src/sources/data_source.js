@@ -94,6 +94,7 @@ export default class DataSource {
 console.log('this before return in datasource',this, dest) //happens first
         return this._load(dest).then((dest) => {
 			console.log('dest in load of DataSource',dest)
+            
             // Post-processing
             for (let layer in dest.source_data.layers) {
                 let data = dest.source_data.layers[layer];

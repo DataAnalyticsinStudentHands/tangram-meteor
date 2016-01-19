@@ -41,11 +41,23 @@ export class DBGeoJSONSource extends DataSource {
 // 			console.log('in for Each',p,dest.sfdata[p])
 // 		})
         //wrap this all in the return promise??
+        var self = this;
         return new Promise((resolve, reject) => {
-            let promise = dest.sfdata;
+            let data = dest.sfdata;
 			console.log('dest before rsolve',dest)
-			resolve(dest.sfdata)
-			console.log('dest after rsolve',dest)
+			resolve(dest);//.sfdata)
+			data.then((body) => {
+                //console.log('body',body)
+                //set tile_indexes??
+                let layer_name = dest.source;
+                //set max zoom?? tolerance?? extent?? buffer??
+                
+                body.forEach(function(m){
+                    dest.source_data.layers[layer_name] = self.getFeatures(m);
+                });
+            })
+        //console.log(body.findOne());
+        
 			// promise.forEach(function(obj){
 			// 	console.log('in return of promise',obj,promise[obj])
 			// })
@@ -78,7 +90,7 @@ export class DBGeoJSONSource extends DataSource {
         });
             */
             
-/*        promise((body) => {
+/*        promise.then((body) => {
             console.log('promise.then',body)
 //            console.log('promiseready?',body.ready())
 //            console.log('promiseas meteor?',body.findOne())
@@ -97,6 +109,57 @@ export class DBGeoJSONSource extends DataSource {
             
         
     }
+    
+    getFeatures (t) {
+            let coords = t.loc.coords;
+
+        // request a particular tile
+        //let t = this.tile_indexes[layer_name].getTile(coords.z, coords.x, coords.y);
+
+        // Convert from MVT-style JSON struct to GeoJSON
+        let collection;
+        if (t && t.features) {
+            collection = {
+                type: 'FeatureCollection',
+                features: []
+            };
+
+            for (let feature of t.features) {
+                // GeoJSON feature
+                let f = {
+                    type: 'Feature',
+                    geometry: {},
+                    properties: feature.tags
+                };
+
+                if (feature.type === 1) {
+                    f.geometry.coordinates = feature.geometry.map(coord => [coord[0], coord[1]]);
+                    f.geometry.type = 'MultiPoint';
+                }
+                else if (feature.type === 2 || feature.type === 3) {
+                    f.geometry.coordinates = feature.geometry.map(ring =>
+                        ring.map(coord => [coord[0], coord[1]])
+                    );
+
+                    if (feature.type === 2) {
+                        f.geometry.type = 'MultiLineString';
+                    }
+                    else  {
+                        f.geometry = MVTSource.decodeMultiPolygon(f.geometry); // un-flatten rings
+                    }
+                }
+                else {
+                    continue;
+                }
+
+                collection.features.push(f);
+            }
+        }
+        console.log("collection",collection)
+
+        return collection;
+    }
+    
 
     formatUrl (dest) { //still need to replace other??
 		console.log('in formatURL')
