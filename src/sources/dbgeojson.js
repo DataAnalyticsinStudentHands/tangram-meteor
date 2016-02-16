@@ -36,7 +36,7 @@ export class DBGeoJSONSource extends DataSource {
         dest.debug = dest.debug || {};
         dest.debug.network = +new Date();
         
-        console.log('dest.sfdata',dest.sfdata)
+        //console.log('dest.sfdata',dest.sfdata)
 		// dest.sfdata.forEach(function(p){
 // 			console.log('in for Each',p,dest.sfdata[p])
 // 		})
@@ -44,10 +44,15 @@ export class DBGeoJSONSource extends DataSource {
         var self = this;
         return new Promise((resolve, reject) => {
             let data = dest.sfdata;
-			console.log('dest before rsolve',dest)
-			resolve(dest);//.sfdata)
+            console.log('data',data)
+            if(data!=undefined && Object.keys(data).length>0){
+            console.log('Object.keys(data)',Object.keys(data).length,Object.keys(data))
+            //let data = this.sfdata;
+            //if (typeof data == 'object'){
+            //if (Object.keys(data).length > 0){
+               // console.log('inside if data',data)
 			data.then((body) => {
-                //console.log('body',body)
+                console.log('body',body)
                 //set tile_indexes??
                 let layer_name = dest.source;
                 //set max zoom?? tolerance?? extent?? buffer??
@@ -55,12 +60,10 @@ export class DBGeoJSONSource extends DataSource {
                 body.forEach(function(m){
                     dest.source_data.layers[layer_name] = self.getFeatures(m);
                 });
+                resolve(dest)
             })
-        //console.log(body.findOne());
-        
-			// promise.forEach(function(obj){
-			// 	console.log('in return of promise',obj,promise[obj])
-			// })
+            }
+           // }}
 		});
        
          /*   
