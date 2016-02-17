@@ -1,6 +1,7 @@
 import DataSource, {NetworkSource, NetworkTileSource} from './data_source'; //think about tiling
 import {GeoJSONSource, GeoJSONTileSource} from './geojson';  
 import {MVTSource} from './mvt';
+//import geojsonvt from 'geojson-vt';
 import Geo from '../geo';
 
 // For tiling GeoJSON client-side
@@ -12,6 +13,7 @@ import geojsonvt from 'geojson-vt';
 */
 
 export class DBGeoJSONSource extends DataSource {
+//export class DBGeoJSONSource extends NetworkSource { //tries to load http
 
     constructor(source) {
 		console.log('dbgeojsonsource in constructor',source)
@@ -19,7 +21,8 @@ export class DBGeoJSONSource extends DataSource {
 		this.load(source); //see if that lets you do whole replace???
         this.tiled = true;  //want to figure out how to use tiling to help with visibility
         this.load_data = null;
-        this.sfdata = source.sfdata;
+        //this.load_sfdata = null;
+        this.sfdata = null; //source.sfdata;
 		this.collect_name = source.collect_name;
         
         this.tile_indexes = {}; // geojson-vt tile indices, by layer name
@@ -29,33 +32,80 @@ export class DBGeoJSONSource extends DataSource {
     }
 
     _load(dest) {
-		console.log('inside _load',this)
+		console.log('inside _load',this,dest)
         let source_data = dest.source_data;
         //source_data.url = this.url;
         source_data.error = null;
         dest.debug = dest.debug || {};
         dest.debug.network = +new Date();
-        
+       
+        this.load_sfdata = new Promise((resolve, reject) => {
+            console.log('trying to make sfdata')
+                let sfdata = dest.sfdata;
+                if(sfdata != undefined && (Object.keys(sfdata).length>0)){
+                    this.sfdata = sfdata; //don't need both
+                    resolve(sfdata)
+                }
+        })
+       
+       if (!this.load_data){
+            
+            this.load_data = super._load({ source_data: { layers: {} } })
+                .then(this.load_sfdata)
+                .then(data => {
+                    let layers = data.source_data.layers;
+                console.log('end of nested promises',data)
+                    for (let layer_name in layers) {
+                        this.tile_indexes[layer_name] = geojsonvt(layers[layer_name], {
+                            maxZoom: this.max_zoom,  // max zoom to preserve detail on
+                            tolerance: 3, // simplification tolerance (higher means simpler)
+                            extent: Geo.tile_scale, // tile extent (both width and height)
+                            buffer: 0     // tile buffer on each side
+                        });
+                    }
+
+                this.loaded = true;
+                return data;
+                
+            });
+        }
+        return this.load_data.then(() => {
+            for (let layer_name in this.tile_indexes) {
+                dest.source_data.layers[layer_name] = this.getTileFeatures(dest, layer_name);
+            }
+            console.log('do I get into the return loop?',dest)
+            return dest;
+        });
+    }
+    
+    
+ /*       return this.load_data.then(() => {
+            for (let layer_name in this.tile_indexes) {
+                dest.source_data.layers[layer_name] = this.getTileFeatures(dest, layer_name);
+            }
+            return dest;
+        });*/
+    //}
         //console.log('dest.sfdata',dest.sfdata)
 		// dest.sfdata.forEach(function(p){
 // 			console.log('in for Each',p,dest.sfdata[p])
 // 		})
         //wrap this all in the return promise??
-        var self = this;
+    //    var self = this;
 //        return new Promise((resolve, reject) => {
 			
-            let data = dest.sfdata;
-			return Promise.resolve(dest).then((body) => {
+//            let data = dest.sfdata;
+	//		return Promise.resolve(data).then((body) => {
             //console.log('data',data)
-			if(data!=undefined && Object.keys(data).length>0){
-			  body.forEach(function(m){
-				  console.log(m)
-                    dest.source_data.layers[layer_name] = self.getFeatures(m);
-                })//;
+	//		if(data!=undefined && Object.keys(data).length>0){
+	//		  body.forEach(function(m){
+	//			  console.log(m)
+    //                dest.source_data.layers[layer_name] = self.getFeatures(m);
+  //              })//;
 				//console.log('data inside foreach',data)
 			  
-			}
-		})
+//			}else{console.log('no data yet')}
+//		})
 		//resolve(dest)
 	//})
 		 
@@ -127,7 +177,7 @@ export class DBGeoJSONSource extends DataSource {
 			*/
             
         
-    }
+    
     
     getFeatures (t) {
             let coords = t.loc.coords;
