@@ -42,16 +42,31 @@ export class DBGeoJSONSource extends DataSource {
 // 		})
         //wrap this all in the return promise??
         var self = this;
-        return new Promise((resolve, reject) => {
+//        return new Promise((resolve, reject) => {
+			
             let data = dest.sfdata;
-            console.log('data',data)
-            if(data!=undefined && Object.keys(data).length>0){
-            console.log('Object.keys(data)',Object.keys(data).length,Object.keys(data))
+			return Promise.resolve(dest).then((body) => {
+            //console.log('data',data)
+			if(data!=undefined && Object.keys(data).length>0){
+			  body.forEach(function(m){
+				  console.log(m)
+                    dest.source_data.layers[layer_name] = self.getFeatures(m);
+                })//;
+				//console.log('data inside foreach',data)
+			  
+			}
+		})
+		//resolve(dest)
+	//})
+		 
+          //  if(data!=undefined && Object.keys(data).length>0){
+            //console.log('Object.keys(data)',Object.keys(data).length,Object.keys(data))
             //let data = this.sfdata;
             //if (typeof data == 'object'){
             //if (Object.keys(data).length > 0){
                // console.log('inside if data',data)
-			data.then((body) => {
+/*			data.then((body) => {
+				console.log('inside data.then')
                 console.log('body',body)
                 //set tile_indexes??
                 let layer_name = dest.source;
@@ -60,11 +75,12 @@ export class DBGeoJSONSource extends DataSource {
                 body.forEach(function(m){
                     dest.source_data.layers[layer_name] = self.getFeatures(m);
                 });
-                resolve(dest)
+			  resolve(dest)
             })
             }
+*/			
            // }}
-		});
+//		});
        
          /*   
         if (!this.load_data) {
