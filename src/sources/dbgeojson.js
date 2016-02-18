@@ -34,25 +34,40 @@ export class DBGeoJSONSource extends DataSource {
     _load(dest) {
 		console.log('inside _load',this,dest)
         let source_data = dest.source_data;
-        //source_data.url = this.url;
         source_data.error = null;
         dest.debug = dest.debug || {};
-        dest.debug.network = +new Date();
-       
+        dest.debug.network = new Date();
+        
+        
         this.load_sfdata = new Promise((resolve, reject) => {
-            console.log('trying to make sfdata')
-                let sfdata = dest.sfdata;
-                if(sfdata != undefined && (Object.keys(sfdata).length>0)){
-                    this.sfdata = sfdata; //don't need both
+            //setTimeout(function(){
+                
+            console.log('trying to make sfdata this is dest',dest)
+                var sfdata = dest.sfdata;
+            
+            console.log('sfdata b4 if',sfdata, Object.keys(sfdata).length)
+                //if(sfdata != undefined && (Object.keys(sfdata).length>0)){
+                 //   console.log('sfdata in if',sfdata)
                     resolve(sfdata)
-                }
+                //}
+            //},13000)
+        })
+        this.load_sfdata.then((sfdata) =>{
+            var self = this;
+            console.log('this sfdata', sfdata, Object.keys(sfdata.collection))
+            console.log('secondtry',sfdata.collection.findOne())
+//            sfdata.collection.find().forEach(function(m){
+//		          console.log('in ang2',m)
+//              dest.source_data.layers[layer_name] = self.getFeatures(m);
+//            })
         })
        
        if (!this.load_data){
             
             this.load_data = super._load({ source_data: { layers: {} } })
-                .then(this.load_sfdata)
+        /*        .then(this.load_sfdata)
                 .then(data => {
+                    //setTimeout(function(){
                     let layers = data.source_data.layers;
                 console.log('end of nested promises',data)
                     for (let layer_name in layers) {
@@ -63,16 +78,17 @@ export class DBGeoJSONSource extends DataSource {
                             buffer: 0     // tile buffer on each side
                         });
                     }
-
                 this.loaded = true;
                 return data;
+                    //},13000)
                 
-            });
+                
+            }); */
         }
         return this.load_data.then(() => {
-            for (let layer_name in this.tile_indexes) {
-                dest.source_data.layers[layer_name] = this.getTileFeatures(dest, layer_name);
-            }
+//            for (let layer_name in this.tile_indexes) {
+//                dest.source_data.layers[layer_name] = this.getTileFeatures(dest, layer_name);
+//            }
             console.log('do I get into the return loop?',dest)
             return dest;
         });
