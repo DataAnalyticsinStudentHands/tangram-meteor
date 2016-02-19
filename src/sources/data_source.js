@@ -151,7 +151,7 @@ export class NetworkSource extends DataSource {
 
     _load (dest) {
         // super.load(dest);
-        console.log('is this first? - _load in Network')
+        console.log('is this first? - _load in Network',dest)
         let url = this.formatUrl(dest);
 		
         let source_data = dest.source_data;
@@ -166,7 +166,6 @@ export class NetworkSource extends DataSource {
             // if (Math.random() < .7) {
             //     promise = Promise.reject(Error('fake data source error'));
             // }
-
             let promise = Utils.io(url, 60 * 1000, this.response_type);
             source_data.request = promise.request;
 			
