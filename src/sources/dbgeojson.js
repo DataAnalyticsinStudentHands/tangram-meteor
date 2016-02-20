@@ -10,7 +10,7 @@ export class DBGeoJSONSource extends DataSource {
 
     constructor (source) {
         super(source);
-		
+		console.log('source in db constructor',source)
         this.response_type = ""; // use to set explicit XHR type
 		this.loaded = false;
 		//this calls Meteor and prints results to console, etc., but throws error as well:
@@ -23,8 +23,9 @@ export class DBGeoJSONSource extends DataSource {
 // 		})//.then(function(){this.loaded=true})
 		//console.log(list4promise.count)
 		//this.list4promise = list4promise;
-		var collname = 'monitors'
-		var asyncEach3 = function(collname, callback) {
+		/*
+		this.collname = 'monitors'
+		this.asyncEach3 = function(collname, callback) {
 			var arr = [1]
 			//var arr = Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch();
 		    // Utility inner function to create a wrapper function for the callback
@@ -39,12 +40,15 @@ export class DBGeoJSONSource extends DataSource {
 		        setTimeout(makeCallbackWrapper(arr, i, callback), 0);
 		    }
 		}
-		var logItem = function(item) {
-			list4promise = Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch();
+		var self = this;
+		this.logItem = function(item) {
+			self.list4promise = Meteor.default_connection._mongo_livedata_collections[self.collname].find().fetch();
 			console.log('list4promise in callback',list4promise)
 		}
-		asyncEach3(collname,logItem)	
+		this.asyncEach3(this.collname,this.logItem)  //this one works
+		*/
     }
+	
 
     _load (dest) {
 	
@@ -72,39 +76,25 @@ export class DBGeoJSONSource extends DataSource {
    //         let promise = Utils.db('monitors');
     	//
 		//	console.log('Meteor inside promise',Meteor)
-		   //var promise = new Promise((resolve, reject) => {
-			//	console.log('list4promise',self.list4promise)
-			   //if (list4promise.count)
-			  // resolve(list4promise)
-			   //if (Meteor == undefined){
-			//	   console.log('be4',this)
-			  // }else{
-			   	//console.log('after',Meteor)
-		   		// var sub = Meteor.subscribe('monitors');
-//  		         if (sub.ready()) {
-//  		     				console.log('subready',sub,tst)
-//  		//                     var coll = "monitors";
-//  		                     resolve(Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch())
-//  		         }
-			  // }
-			 
-			 //})
-		 
-        //
-				//             promise.then((body) => {
-				//                 dest.debug.response_size = body.length || body.byteLength;
-				//                 dest.debug.network = +new Date() - dest.debug.network;
-				//                 dest.debug.parsing = +new Date();
-				//                 console.log('body as respnse from db?',body)
-				//                 JSON.parse(body)
-				//                 //this.parseSourceData(dest, source_data, body);
-				//                 dest.debug.parsing = +new Date() - dest.debug.parsing;
-				//                 resolve(dest);
-				//             }).catch((error) => {
-				// console.log('error from promise',error)
-				//                 source_data.error = error.toString();
-				//                 resolve(dest); // resolve request but pass along error
-				//             });
+		   var promise = new Promise((resolve, reject) => {
+			   		
+			 })
+
+
+				            promise.then((body) => {
+				                dest.debug.response_size = body.length || body.byteLength;
+				                dest.debug.network = +new Date() - dest.debug.network;
+				                dest.debug.parsing = +new Date();
+				                console.log('body as respnse from db?',body)
+				                JSON.parse(body)
+				                //this.parseSourceData(dest, source_data, body);
+				                dest.debug.parsing = +new Date() - dest.debug.parsing;
+				                resolve(dest);
+				            }).catch((error) => {
+				console.log('error from promise',error)
+				                source_data.error = error.toString();
+				                resolve(dest); // resolve request but pass along error
+				            });
         })
 	}
 }
