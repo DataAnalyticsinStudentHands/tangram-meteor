@@ -95,21 +95,24 @@ Utils.createObjectURL = function (url) {
 };
 
 Utils.db = function (tst){
-//    var Meteor;
-//    	setTimeout(function(){
-//    var sub = Meteor.subscribe('monitors');
-//    var promise = new Promise((resolve, reject) => {
-//		 
-//		//		console.log('in autorun',sub.ready())
-//		        if (sub.ready()) {
-//    				console.log('subready',sub,tst)
-//                    var coll = "monitors";  
-//                    resolve(Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch())
-//		        }
-//		
+    var Meteor;
+	
+   	setTimeout(function(){
+   	 			var sub = Meteor.subscribe('monitors');
+ //  var promise = new Promise((resolve, reject) => {
+		        if (sub.ready()) {
+   				console.log('subready',sub,tst)
+                   var coll = "monitors";
+				   var testing = Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch();
+				   testing.forEach(function(m){
+				   		console.log(m)
+				   })
+                   //resolve(Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch())
+		        }
+
 //		})
-//    return promise;
-//    	}, 10000)
+ //  return promise;
+   	}, 10000)
 }
 
 Utils.io = function (url, timeout = 60000, responseType = 'text', method = 'GET', headers = {}) {
