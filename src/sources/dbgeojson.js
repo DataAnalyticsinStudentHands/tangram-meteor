@@ -1,152 +1,100 @@
 import DataSource, {NetworkSource, NetworkTileSource} from './data_source'; //think about tiling
 import {GeoJSONSource, GeoJSONTileSource} from './geojson';  
 import {MVTSource} from './mvt';
-import Utils from '../utils/utils';
 import Geo from '../geo';
 import geojsonvt from 'geojson-vt';
-declare var Meteor:any;
 
+//needs to get both networksource from data_source.js and geojsonsource
 export class DBGeoJSONSource extends DataSource {
 
     constructor (source) {
         super(source);
 		console.log('source in db constructor',source)
-        this.response_type = ""; // use to set explicit XHR type
 		this.loaded = false;
-		//this calls Meteor and prints results to console, etc., but throws error as well:
-		//console.log('inside constructor',Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch())
-//		let constPromise = Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch();
-		var list4promise = []
-		// constPromise.forEach(function(m){
-// 			list4promise.push(m)
-//  			//console.log(m) - is there a way to add output to dest in constructor??
-// 		})//.then(function(){this.loaded=true})
-		//console.log(list4promise.count)
-		//this.list4promise = list4promise;
-		/*
-		this.collname = 'monitors'
-		this.asyncEach3 = function(collname, callback) {
-			var arr = [1]
-			//var arr = Meteor.default_connection._mongo_livedata_collections.monitors.find().fetch();
-		    // Utility inner function to create a wrapper function for the callback
-		    function makeCallbackWrapper(arr, i, callback) {
-		        // Create our function scope for use inside the loop
-		        return function() {
-		            callback(arr[i]);
-		        }
-		    }
-
-		    for (var i = 0; i < arr.length; ++i) {
-		        setTimeout(makeCallbackWrapper(arr, i, callback), 0);
-		    }
-		}
-		var self = this;
-		this.logItem = function(item) {
-			self.list4promise = Meteor.default_connection._mongo_livedata_collections[self.collname].find().fetch();
-			console.log('list4promise in callback',list4promise)
-		}
-		this.asyncEach3(this.collname,this.logItem)  //this one works
-		*/
+		this.dbdata = source.dbdata;
+		this.collectname = source.collect_name;
+        this.tiled = true;
+        this.load_data = null;
+        this.tile_indexes = {}; // geojson-vt tile indices, by layer name
+        this.max_zoom = Math.max(this.max_zoom || 0, 15); // TODO: max zoom < 15 causes artifacts/no-draw at 20, investigate
+        this.pad_scale = 0; // we don't want padding on auto-tiled sources
+        this.enforce_winding = (source.enforce_winding === false) ? false : true; // default on, can be forced off
     }
 	
 
     _load (dest) {
-	
+		console.log('in _load DBG',dest)
         let source_data = dest.source_data;
-        source_data.collection = 'monitors';
+		source_data.error = null;
         dest.debug = dest.debug || {};
         dest.debug.network = +new Date();
-//		console.log('list4promise',this.list4promise)
-		
-		// return new Promise((resolve, reject) => {
-		//             dest.debug.response_size = body.length || body.byteLength;
-		//             dest.debug.network = +new Date() - dest.debug.network;
-		//             dest.debug.parsing = +new Date();
-		// 	dest.debug.parsing = +new Date() - dest.debug.parsing;
-		// 	console.log('list4promise',self.list4promise)
-		// 	//if (self.loaded){
-		// 	resolve(dest)
-		// 		//}
-		// });
-		// }
 
         return new Promise((resolve, reject) => {
-            source_data.error = null;
-            
-   //         let promise = Utils.db('monitors');
-    	//
-		//	console.log('Meteor inside promise',Meteor)
-		   var promise = new Promise((resolve, reject) => {
-			   		
-			 })
-
-
-				            promise.then((body) => {
-				                dest.debug.response_size = body.length || body.byteLength;
-				                dest.debug.network = +new Date() - dest.debug.network;
-				                dest.debug.parsing = +new Date();
-				                console.log('body as respnse from db?',body)
-				                JSON.parse(body)
-				                //this.parseSourceData(dest, source_data, body);
-				                dest.debug.parsing = +new Date() - dest.debug.parsing;
-				                resolve(dest);
-				            }).catch((error) => {
-				console.log('error from promise',error)
-				                source_data.error = error.toString();
-				                resolve(dest); // resolve request but pass along error
-				            });
+			//represents work done by NetworkSource; return a promise not working; now creates whole in tangram-integration
+			
+			source_data.layers = {};
+            //let layers = data.source_data.layers; //returned from promise, if we could get it to work
+			let layer_name = this.collectname;
+			this.tile_indexes[layer_name] = geojsonvt(this.dbdata, {
+				maxZoom: this.max_zoom,  // max zoom to preserve detail on
+				tolerance: 3, // simplification tolerance (higher means simpler)
+				extent: Geo.tile_scale, // tile extent (both width and height)
+				buffer: 0     // tile buffer on each side
+			});
+			console.log(this.tile_indexes)
+			this.loaded = true; //not sure if needed 
+			dest.source_data.layers[layer_name] = this.getTileFeatures(dest, layer_name);
+			resolve(dest)
         })
 	}
-}
-    // Sub-classes must implement:
-
-//    formatUrl (dest) {
-//        throw new MethodNotImplemented('formatUrl');
-//    }
-//
-//    parseSourceData (dest, source, reponse) {
-//        throw new MethodNotImplemented('parseSourceData');
-//    }
-//}
-
-
-/*** Generic network tile loading - abstract class 
-
-export class DBNetworkTileSource extends NetworkSource {
-
-    constructor (source) {
-        super(source);
-//console.log('NetworkTileSource',source)
-        this.tiled = true;
-        this.url_hosts = null;
-        var host_match = this.url.match(/{s:\[([^}+]+)\]}/);
-        if (host_match != null && host_match.length > 1) {
-            this.url_hosts = host_match[1].split(',');
-            this.next_host = 0;
-        }
-    }
-
-    formatUrl(tile) {
+    getTileFeatures(tile, layer_name) {   
         let coords = Geo.wrapTile(tile.coords, { x: true });
-        var url = this.url.replace('{x}', coords.x).replace('{y}', coords.y).replace('{z}', coords.z);
 
-        if (this.url_hosts != null) {
-            url = url.replace(/{s:\[([^}+]+)\]}/, this.url_hosts[this.next_host]);
-            this.next_host = (this.next_host + 1) % this.url_hosts.length;
+        // request a particular tile
+        let t = this.tile_indexes[layer_name].getTile(coords.z, coords.x, coords.y);
+
+        // Convert from MVT-style JSON struct to GeoJSON
+        let collection;
+        if (t && t.features) {
+            collection = {
+                type: 'FeatureCollection',
+                features: []
+            };
+
+            for (let feature of t.features) {
+                // GeoJSON feature
+                let f = {
+                    type: 'Feature',
+                    geometry: {},
+                    properties: feature.tags
+                };
+
+                if (feature.type === 1) {
+                    f.geometry.coordinates = feature.geometry.map(coord => [coord[0], coord[1]]);
+                    f.geometry.type = 'MultiPoint';
+                }
+                else if (feature.type === 2 || feature.type === 3) {
+                    f.geometry.coordinates = feature.geometry.map(ring =>
+                        ring.map(coord => [coord[0], coord[1]])
+                    );
+
+                    if (feature.type === 2) {
+                        f.geometry.type = 'MultiLineString';
+                    }
+                    else  {
+                        f.geometry = MVTSource.decodeMultiPolygon(f.geometry); // un-flatten rings
+                    }
+                }
+                else {
+                    continue;
+                }
+
+                collection.features.push(f);
+            }
         }
-        return url;
-    }
 
-    // Checks for the x/y/z tile pattern in URL template
-    urlHasTilePattern(url) {
-        return url &&
-            url.search('{x}') > -1 &&
-            url.search('{y}') > -1 &&
-            url.search('{z}') > -1;
+        return collection;
     }
-
 }
-***/
 
 DataSource.register(DBGeoJSONSource, 'DBGeoJSON');
-//DataSource.register(DBGeoJSONDataSource, 'DBGeoJSONData');
