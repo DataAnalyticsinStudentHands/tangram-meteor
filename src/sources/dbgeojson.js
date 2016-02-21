@@ -11,8 +11,8 @@ export class DBGeoJSONSource extends DataSource {
         super(source);
 		console.log('source in db constructor',source)
 		this.loaded = false;
-		this.dbdata = source.dbdata;
-		this.collectname = source.collect_name;
+		this.dbdata = source.dbdata; 
+		this.layer_name = source.layer_name;
         this.tiled = true;
         this.load_data = null;
         this.tile_indexes = {}; // geojson-vt tile indices, by layer name
@@ -34,25 +34,30 @@ export class DBGeoJSONSource extends DataSource {
 			
 			source_data.layers = {};
             //let layers = data.source_data.layers; //returned from promise, if we could get it to work
-			let layer_name = this.collectname;
+			let layer_name = this.layer_name;
+			console.log('layer_name in dbg load',layer_name,this.dbdata,
 			this.tile_indexes[layer_name] = geojsonvt(this.dbdata, {
 				maxZoom: this.max_zoom,  // max zoom to preserve detail on
 				tolerance: 3, // simplification tolerance (higher means simpler)
 				extent: Geo.tile_scale, // tile extent (both width and height)
 				buffer: 0     // tile buffer on each side
-			});
-			console.log(this.tile_indexes)
+			}) );
+			console.log('tile_indexes no getTile',this.tile_indexes)
+			console.log('tile_indexes',this.tile_indexes[layer_name].getTile(12,964,1694))
 			this.loaded = true; //not sure if needed 
+			console.log('b4 layers',dest.source_data)
 			dest.source_data.layers[layer_name] = this.getTileFeatures(dest, layer_name);
+			console.log('after layers',dest.source_data)
 			resolve(dest)
         })
 	}
     getTileFeatures(tile, layer_name) {   
+		console.log('tile',tile,layer_name)
         let coords = Geo.wrapTile(tile.coords, { x: true });
-
+		console.log('coords',coords)
         // request a particular tile
         let t = this.tile_indexes[layer_name].getTile(coords.z, coords.x, coords.y);
-
+		console.log('t after getTile',t)
         // Convert from MVT-style JSON struct to GeoJSON
         let collection;
         if (t && t.features) {
@@ -92,7 +97,7 @@ export class DBGeoJSONSource extends DataSource {
                 collection.features.push(f);
             }
         }
-
+		console.log('collection',collection)
         return collection;
     }
 }

@@ -23,16 +23,20 @@ export class GeoJSONSource extends NetworkSource {
     }
 
     _load(dest) {
+		console.log('in Ntwork')
         if (!this.load_data) {
             this.load_data = super._load({ source_data: { layers: {} } }).then(data => {
                 let layers = data.source_data.layers;
                 for (let layer_name in layers) {
+					console.log('layer_name in geojson',layer_name,this.dbdata)
                     this.tile_indexes[layer_name] = geojsonvt(layers[layer_name], {
                         maxZoom: this.max_zoom,  // max zoom to preserve detail on
                         tolerance: 3, // simplification tolerance (higher means simpler)
                         extent: Geo.tile_scale, // tile extent (both width and height)
                         buffer: 0     // tile buffer on each side
                     });
+			console.log('tile_indexes no getTile in geojson',this.tile_indexes)
+			console.log('tile_indexes in geojson',this.tile_indexes[layer_name].getTile(12,964,1694))
                 }
 
                 this.loaded = true;
@@ -53,6 +57,7 @@ export class GeoJSONSource extends NetworkSource {
 
         // request a particular tile
         let t = this.tile_indexes[layer_name].getTile(coords.z, coords.x, coords.y);
+		console.log('t after getTile in geojson',t)
 
         // Convert from MVT-style JSON struct to GeoJSON
         let collection;
@@ -125,7 +130,7 @@ export class GeoJSONTileSource extends NetworkTileSource {
 
     constructor(source) {
         super(source);
-
+		console.log('in ntworkTile')
         // Check for URL tile pattern, if not found, treat as standalone GeoJSON/TopoJSON object
         if (!this.urlHasTilePattern(this.url)) {
             // Check instance type from parent class
