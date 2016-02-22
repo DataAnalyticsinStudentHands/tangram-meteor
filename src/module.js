@@ -16,7 +16,6 @@ import Geo from './geo';
 import DataSource from './sources/data_source';
 import './sources/geojson';
 import './sources/dbgeojson';  //Dan's addition
-import './sources/single_feature';  //Dan's addition
 import './sources/topojson';
 import './sources/mvt';
 import TileManager from './tile_manager';
@@ -30,6 +29,7 @@ import WorkerBroker from './utils/worker_broker';
 import {ruleCache} from './styles/rule';
 import {StyleManager} from './styles/style_manager';
 import {StyleParser} from './styles/style_parser';
+import Collision from './labels/collision';
 import FeatureSelection from './selection';
 
 import yaml from 'js-yaml';
@@ -57,6 +57,7 @@ var debug = {
     ruleCache,
     StyleManager,
     StyleParser,
+    Collision,
     FeatureSelection
 };
 

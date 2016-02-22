@@ -59,7 +59,14 @@ Object.assign(self, {
         config.sources = Utils.stringsToFunctions(config.sources); // parse new sources
         self.sources.tiles = {}; // clear previous sources
         for (let name in config.sources) {
-            let source = DataSource.create(Object.assign({}, config.sources[name], {name}));
+            let source;
+            try {
+                source = DataSource.create(Object.assign({}, config.sources[name], {name}));
+            }
+            catch(e) {
+                continue;
+            }
+
             if (!source) {
                 continue;
             }
@@ -213,17 +220,11 @@ Object.assign(self, {
         return FeatureSelection.getMapSize();
     },
 
-    // Texture info needs to be synced from main thread
+    // Texture info needs to be synced from main thread, e.g. width/height, which we only know after the texture loads
     syncTextures (tex_config) {
-        // We're only syncing the textures that have sprites defined, since these are (currently) the only ones we
-        // need info about for geometry construction (e.g. width/height, which we only know after the texture loads)
         let textures = [];
         if (tex_config) {
-            for (let [texname, texture] of Utils.entries(tex_config)) {
-                if (texture.sprites) {
-                    textures.push(texname);
-                }
-            }
+            textures.push(...Object.keys(tex_config));
         }
 
         Utils.log('trace', 'sync textures to worker:', textures);

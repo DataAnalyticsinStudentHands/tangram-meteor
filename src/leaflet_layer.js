@@ -9,15 +9,16 @@ export function leafletLayer(options) {
 }
 
 function extendLeaflet(options) {
+
     // If LeafletLayer is already defined when this is called just return that immediately
     // e.g. if you call leafletLayer multiple times (which is valid)
     if (typeof LeafletLayer !== 'undefined') {
         return new LeafletLayer(options);
     }
-	
+
     // Leaflet layer functionality is only defined in main thread
     if (Utils.isMainThread) {
-		
+
         let L = options.leaflet || window.L;
 
         // Determine if we are extending the leaflet 0.7.x TileLayer class, or the newer

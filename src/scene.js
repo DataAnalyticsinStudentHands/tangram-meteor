@@ -74,7 +74,11 @@ export default class Scene {
         this.render_loop = !options.disableRenderLoop;  // disable render loop - app will have to manually call Scene.render() per frame
         this.render_loop_active = false;
         this.render_loop_stop = false;
+        this.render_count = 0;
+        this.last_render_count = 0;
+        this.render_count_changed = false;
         this.frame = 0;
+        this.queue_screenshot = null;
         this.resetTime();
 
         this.zoom = null;
@@ -105,6 +109,7 @@ export default class Scene {
 
         this.updating = 0;
         this.generation = 0; // an id that is incremented each time the scene config is invalidated
+        this.last_complete_generation = 0; // last generation id with a complete view
         this.setupDebug();
 
         this.logLevel = options.logLevel || 'warn';
@@ -595,6 +600,8 @@ export default class Scene {
         // Render the scene
         this.updateDevicePixelRatio();
         this.render();
+        this.completeScreenshot(); // completes screenshot capture if requested
+        this.updateViewComplete(); // fires event when rendered tile set or style changes
 
         // Post-render loop hook
         if (typeof this.postUpdate === 'function') {
@@ -649,7 +656,10 @@ export default class Scene {
             gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         }
 
+        this.render_count_changed = false;
         if (this.render_count !== this.last_render_count) {
+            this.render_count_changed = true;
+
             this.getFeatureSelectionMapSize().then(size => {
                 log.info(`Scene: rendered ${this.render_count} primitives (${size} features in selection map)`);
             }, () => {}); // no op when promise rejects (only print last response)
@@ -719,7 +729,7 @@ export default class Scene {
 
                 // TODO: don't set uniforms when they haven't changed
                 program.uniform('2f', 'u_resolution', this.device_size.width, this.device_size.height);
-                program.uniform('1f', 'u_time', ((+new Date()) - this.start_time) / 1000);
+                program.uniform('1f', 'u_time', this.animated ? (((+new Date()) - this.start_time) / 1000) : 0);
                 program.uniform('3f', 'u_map_position', this.center_meters.x, this.center_meters.y, this.zoom);
                 program.uniform('1f', 'u_meters_per_pixel', this.meters_per_pixel);
                 program.uniform('1f', 'u_device_pixel_ratio', Utils.device_pixel_ratio);
@@ -962,16 +972,80 @@ export default class Scene {
         });
     }
 
+    // Add source to a scene, arguments `name` and `config` need to be provided:
+    //  - If the name doesn't match a sources it will create it
+    //  - the `config` obj follow the YAML scene spec, ex: ```{type: 'TopoJSON', url: "//vector.mapzen.com/osm/all/{z}/{x}/{y}.topojson"]}```
+    //    that looks like:
+    //
+    //      scene.setDataSource("osm", {type: 'TopoJSON', url: "//vector.mapzen.com/osm/all/{z}/{x}/{y}.topojson" });
+    //
+    //  - also can be pass a ```data``` obj: ```{type: 'GeoJSON', data: JSObj ]}```
+    //
+    //      var geojson_data = {};
+    //      ...
+    //      scene.setDataSource("dynamic_data", {type: 'GeoJSON', data: geojson_data });
+    //
+    setDataSource (name, config) {
+        if (!name || !config || !config.type || (!config.url && !config.data)) {
+            log.error("No name provided or not a valid config:", name, config);
+            return;
+        }
+
+        let load = (this.config.sources[name] == null);
+        let source = this.config.sources[name] = Object.assign({}, config);
+
+        if (source.data && typeof source.data === 'object') {
+            source.url = Utils.createObjectURL(new Blob([JSON.stringify(source.data)]));
+            delete source.data;
+        }
+
+        if (load) {
+            this.updateConfig({ rebuild: true });
+        } else {
+            this.rebuild();
+        }
+    }
+
     loadDataSources() {
+        let reset = []; // sources to reset
+        let prev_source_names = Object.keys(this.sources);
+
         for (var name in this.config.sources) {
             let source = this.config.sources[name];
-            this.sources[name] = DataSource.create(Object.assign({}, source, {name}));
+            let prev_source = this.sources[name];
 
-            if (!this.sources[name]) {
-                delete this.sources[name];
-                log.warn(`Scene: could not create data source`, source);
-                this.trigger('warning', { type: 'sources', source, message: `Could not create data source` });
+            try {
+                this.sources[name] = DataSource.create(Object.assign({}, source, {name}));
+                if (!this.sources[name]) {
+                    throw {};
+                }
             }
+            catch(e) {
+                delete this.sources[name];
+                let message = `Could not create data source: ${e.message}`;
+                log.warn(`Scene: ${message}`, source);
+                this.trigger('warning', { type: 'sources', source, message });
+            }
+
+            // Data source changed?
+            if (DataSource.changed(this.sources[name], prev_source)) {
+                reset.push(name);
+            }
+        }
+
+        // Sources that were removed
+        for (let s of prev_source_names) {
+            if (!this.config.sources[s]) {
+                delete this.sources[s]; // TODO: remove from workers too?
+                reset.push(s);
+            }
+        }
+
+        // Remove tiles from sources that have changed
+        if (reset.length > 0) {
+            this.tile_manager.removeTiles(tile => {
+                return (reset.indexOf(tile.source.name) > -1);
+            });
         }
     }
 
@@ -1191,6 +1265,58 @@ export default class Scene {
     // Reset internal clock, mostly useful for consistent experience when changing styles/debugging
     resetTime() {
         this.start_time = +new Date();
+    }
+
+    // Fires event when rendered tile set or style changes
+    updateViewComplete () {
+        if ((this.render_count_changed || this.generation !== this.last_complete_generation) &&
+            !this.tile_manager.isLoadingVisibleTiles()) {
+            this.last_complete_generation = this.generation;
+            this.trigger('view_complete');
+        }
+    }
+
+    resetViewComplete () {
+        this.last_complete_generation = null;
+    }
+
+    // Take a screenshot
+    // Asynchronous because we have to wait for next render to capture buffer
+    // Returns a promise
+    screenshot () {
+        if (this.queue_screenshot != null) {
+            return this.queue_screenshot.promise; // only capture one screenshot at a time
+        }
+
+        this.requestRedraw();
+
+        // Will resolve once rendering is complete and render buffer is captured
+        this.queue_screenshot = {};
+        this.queue_screenshot.promise = new Promise((resolve, reject) => {
+            this.queue_screenshot.resolve = resolve;
+            this.queue_screenshot.reject = reject;
+        });
+        return this.queue_screenshot.promise;
+    }
+
+    // Called after rendering, captures render buffer and resolves promise with image data
+    completeScreenshot () {
+        if (this.queue_screenshot != null) {
+            // Get data URL, convert to blob
+            // Strip host/mimetype/etc., convert base64 to binary without UTF-8 mangling
+            // Adapted from: https://gist.github.com/unconed/4370822
+            var url = this.canvas.toDataURL('image/png');
+            var data = atob(url.slice(22));
+            var buffer = new Uint8Array(data.length);
+            for (var i = 0; i < data.length; ++i) {
+                buffer[i] = data.charCodeAt(i);
+            }
+            var blob = new Blob([buffer], { type: 'image/png' });
+
+            // Resolve with screenshot data
+            this.queue_screenshot.resolve({ url, blob });
+            this.queue_screenshot = null;
+        }
     }
 
 

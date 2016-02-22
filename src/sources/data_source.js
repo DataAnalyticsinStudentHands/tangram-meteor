@@ -5,26 +5,26 @@ import Utils from '../utils/utils';
 
 export default class DataSource {
 
-    //called internally from scene.js 965
-    constructor (source) {
-        this.id = source.id;
-        this.name = source.name;
-        this.url = source.url;
-        this.pad_scale = source.pad_scale || 0.0005; // scale tile up by small factor to cover seams
-        this.enforce_winding = source.enforce_winding || false; // whether to enforce winding order
+    constructor (config) {
+        this.config = config; // save original config
+        this.id = config.id;
+        this.name = config.name;
+        this.url = config.url;
+        this.pad_scale = config.pad_scale || 0.0005; // scale tile up by small factor to cover seams
+        this.default_winding = null; // winding order will adapt to data source
 
         // Optional function to transform source data
-        this.transform = source.transform;
+        this.transform = config.transform;
         if (typeof this.transform === 'function') {
             this.transform.bind(this);
         }
 
         // Optional additional data to pass to the transform function
-        this.extra_data = source.extra_data;
+        this.extra_data = config.extra_data;
 
         // Optional additional scripts made available to the transform function
-        if (typeof importScripts === 'function' && source.scripts) {
-            source.scripts.forEach(function(s, si) {
+        if (typeof importScripts === 'function' && config.scripts) {
+            config.scripts.forEach(function(s, si) {
                 try {
                     importScripts(s);
                     Utils.log('info', 'DataSource: loaded library: ' + s);
@@ -37,16 +37,26 @@ export default class DataSource {
         }
 
         // overzoom will apply for zooms higher than this
-        this.max_zoom = source.max_zoom || Geo.default_max_zoom;
-        //not same as Leaflet - this is just top of where it asks for new tiles - gt is key here
+        this.max_zoom = config.max_zoom || Geo.default_max_zoom;
     }
 
     // Create a tile source by type, factory-style
     static create (source) {
         if (DataSource.types[source.type]) {
-			console.log(source.type)
             return new DataSource.types[source.type](source);
         }
+    }
+
+    // Check if a data source definition changed
+    static changed (source, prev_source) {
+        if (!source || !prev_source) {
+            return true;
+        }
+
+        let cur = Object.assign({}, source.config, { id: null }); // null out ids since we don't want to compare them
+        let prev = Object.assign({}, prev_source.config, { id: null });
+
+        return JSON.stringify(cur) !== JSON.stringify(prev);
     }
 
     // Mercator projection
@@ -85,16 +95,13 @@ export default class DataSource {
             }
         }
     }
-	
+
     load(dest) {
         dest.source_data = {};
         dest.source_data.layers = {};
         dest.pad_scale = this.pad_scale;
-//		dest.name = this.name;  //Dan's for testing
-if(dest.source != 'osm'){console.log('this before return in datasource',this, dest)} //happens first
+
         return this._load(dest).then((dest) => {
-			//console.log('dest in load of DataSource',dest)
-            
             // Post-processing
             for (let layer in dest.source_data.layers) {
                 let data = dest.source_data.layers[layer];
@@ -111,19 +118,32 @@ if(dest.source != 'osm'){console.log('this before return in datasource',this, de
                             }
                         });
 
-                        // Optionally enforce winding order since not all data sources guarantee it
-                        if (this.enforce_winding) {
-                            Geo.enforceWinding(feature.geometry, 'CCW');
-                        }
+                        // Use first encountered polygon winding order as default for data source
+                        this.updateDefaultWinding(feature.geometry);
                     });
                 }
             }
+
+            dest.default_winding = this.default_winding || 'CCW';
         });
     }
 
     // Sub-classes must implement
     _load(dest) {
         throw new MethodNotImplemented('_load');
+    }
+
+    // Infer winding for data source from first ring of provided geometry
+    updateDefaultWinding (geom) {
+        if (this.default_winding == null) {
+            if (geom.type === 'Polygon') {
+                this.default_winding = Geo.ringWinding(geom.coordinates[0]);
+            }
+            else if (geom.type === 'MultiPolygon') {
+                this.default_winding = Geo.ringWinding(geom.coordinates[0][0]);
+            }
+        }
+        return this.default_winding;
     }
 
     // Register a new data source type, under a type name
@@ -147,13 +167,17 @@ export class NetworkSource extends DataSource {
     constructor (source) {
         super(source);
         this.response_type = ""; // use to set explicit XHR type
+
+        if (this.url == null) {
+            throw Error('Network data source must provide a `url` property');
+        }
     }
 
     _load (dest) {
         // super.load(dest);
-        console.log('is this first? - _load in Network',dest)
+
         let url = this.formatUrl(dest);
-		
+
         let source_data = dest.source_data;
         source_data.url = url;
         dest.debug = dest.debug || {};
@@ -166,9 +190,10 @@ export class NetworkSource extends DataSource {
             // if (Math.random() < .7) {
             //     promise = Promise.reject(Error('fake data source error'));
             // }
+            // promise.then((body) => {
             let promise = Utils.io(url, 60 * 1000, this.response_type);
             source_data.request = promise.request;
-			
+
             promise.then((body) => {
                 dest.debug.response_size = body.length || body.byteLength;
                 dest.debug.network = +new Date() - dest.debug.network;
@@ -177,7 +202,6 @@ export class NetworkSource extends DataSource {
                 dest.debug.parsing = +new Date() - dest.debug.parsing;
                 resolve(dest);
             }).catch((error) => {
-				console.log('error from promise',error)
                 source_data.error = error.toString();
                 resolve(dest); // resolve request but pass along error
             });
@@ -202,7 +226,7 @@ export class NetworkTileSource extends NetworkSource {
 
     constructor (source) {
         super(source);
-//console.log('NetworkTileSource',source)
+
         this.tiled = true;
         this.url_hosts = null;
         var host_match = this.url.match(/{s:\[([^}+]+)\]}/);

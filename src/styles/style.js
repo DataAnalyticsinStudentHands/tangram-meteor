@@ -4,9 +4,9 @@ import {StyleParser} from './style_parser';
 import FeatureSelection from '../selection';
 import ShaderProgram from '../gl/shader_program';
 import VBOMesh from '../gl/vbo_mesh';
+import Texture from '../gl/texture';
 import Material from '../material';
 import Light from '../light';
-import {MethodNotImplemented} from '../utils/errors';
 import shaderSources from '../gl/shader_sources'; // built-in shaders
 
 import log from 'loglevel';
@@ -206,7 +206,7 @@ export var Style = {
     },
 
     _parseFeature (feature, rule_style, context) {
-        throw new MethodNotImplemented('_parseFeature');
+        return this.feature_style;
     },
 
     preprocess (rule_style) {
@@ -256,6 +256,7 @@ export var Style = {
 
     setGL (gl) {
         this.gl = gl;
+        this.max_texture_size = Texture.getMaxTextureSize(this.gl);
     },
 
     makeMesh (vertex_data, { uniforms } = {}) {
