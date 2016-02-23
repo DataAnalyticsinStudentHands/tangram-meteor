@@ -92,7 +92,6 @@ export class GeoJSONSource extends NetworkSource {
                 collection.features.push(f);
             }
         }
-
         return collection;
     }
 
